@@ -44,6 +44,15 @@ namespace v8 {
 namespace base {
 
 
+#ifdef __arm__
+
+bool OS::ArmUsingHardFloat() {
+  return false;
+}
+
+#endif
+
+
 // Constants used for mmap.
 // kMmapFd is used to pass vm_alloc flags to tag the region with the user
 // defined tag 255 This helps identify V8-allocated regions in memory analysis
@@ -70,7 +79,7 @@ std::vector<OS::SharedLibraryAddress> OS::GetSharedLibraryAddresses() {
   for (unsigned int i = 0; i < images_count; ++i) {
     const mach_header* header = _dyld_get_image_header(i);
     if (header == NULL) continue;
-#if V8_HOST_ARCH_X64
+#if V8_HOST_ARCH_X64 || V8_HOST_ARCH_ARM64
     uint64_t size;
     char* code_ptr = getsectdatafromheader_64(
         reinterpret_cast<const mach_header_64*>(header),
