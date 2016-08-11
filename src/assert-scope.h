@@ -34,6 +34,12 @@ enum PerIsolateAssertType {
   NO_EXCEPTION_ASSERT
 };
 
+class PerThreadAssertRuntime {
+ public:
+  static void TearDown();
+};
+
+
 template <PerThreadAssertType kType, bool kAllow>
 class PerThreadAssertScope {
  public:

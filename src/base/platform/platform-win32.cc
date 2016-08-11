@@ -95,6 +95,9 @@ int strncpy_s(char* dest, size_t dest_size, const char* source, size_t count) {
 namespace v8 {
 namespace base {
 
+std::list<OS::OSAllocation>* OS::os_allocations_;
+LazyMutex OS::os_allocations_mutex_ = LAZY_MUTEX_INITIALIZER;
+
 namespace {
 
 bool g_hard_abort = false;
@@ -799,6 +802,7 @@ void* OS::Allocate(const size_t requested, size_t* allocated,
 
   DCHECK((reinterpret_cast<uintptr_t>(mbase) % OS::AllocateAlignment()) == 0);
 
+  NotifyAllocated(mbase, msize);
   *allocated = msize;
   return mbase;
 }
@@ -807,6 +811,7 @@ void OS::Free(void* address, const size_t size) {
   // TODO(1240712): VirtualFree has a return value which is ignored here.
   VirtualFree(address, 0, MEM_RELEASE);
   USE(size);
+  NotifyDeallocated(address, size);
 }
 
 

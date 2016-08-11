@@ -58,6 +58,7 @@ void* OS::Allocate(const size_t requested, size_t* allocated,
   void* mbase =
       mmap(hint, msize, prot, MAP_PRIVATE | MAP_ANON, kMmapFd, kMmapFdOffset);
   if (mbase == MAP_FAILED) return NULL;
+  NotifyAllocated(mbase, msize);
   *allocated = msize;
   return mbase;
 }

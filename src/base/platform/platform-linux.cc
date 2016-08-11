@@ -103,6 +103,7 @@ void* OS::Allocate(const size_t requested, size_t* allocated,
   int prot = GetProtectionFromMemoryPermission(access);
   void* mbase = mmap(hint, msize, prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (mbase == MAP_FAILED) return NULL;
+  NotifyAllocated(mbase, msize);
   *allocated = msize;
   return mbase;
 }

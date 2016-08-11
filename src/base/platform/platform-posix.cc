@@ -64,6 +64,9 @@
 namespace v8 {
 namespace base {
 
+std::list<OS::OSAllocation>* OS::os_allocations_;
+LazyMutex OS::os_allocations_mutex_ = LAZY_MUTEX_INITIALIZER;
+
 namespace {
 
 // 0 is never a valid thread id.
@@ -114,6 +117,7 @@ void OS::Free(void* address, const size_t size) {
   int result = munmap(address, size);
   USE(result);
   DCHECK(result == 0);
+  NotifyDeallocated(address, size);
 }
 
 

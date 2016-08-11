@@ -34,6 +34,8 @@ namespace base {
 
 class V8_BASE_EXPORT RandomNumberGenerator final {
  public:
+  static void TearDown();
+
   // EntropySource is used as a callback function when V8 needs a source of
   // entropy.
   typedef bool (*EntropySource)(unsigned char* buffer, size_t buflen);

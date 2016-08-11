@@ -2430,6 +2430,10 @@ void Isolate::TearDown() {
 void Isolate::GlobalTearDown() {
   delete thread_data_table_;
   thread_data_table_ = NULL;
+  base::Thread::DeleteThreadLocalKey(isolate_key_);
+  base::Thread::DeleteThreadLocalKey(thread_id_key_);
+  base::Thread::DeleteThreadLocalKey(per_isolate_thread_data_key_);
+  thread_data_table_mutex_.Pointer()->~Mutex();
 }
 
 

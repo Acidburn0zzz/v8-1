@@ -280,6 +280,8 @@ class TimeBase {
 
 class V8_BASE_EXPORT Time final : public time_internal::TimeBase<Time> {
  public:
+  static void TearDown();
+
   // Contains the NULL time. Use Time::Now() to get the current time.
   Time() : TimeBase(0) {}
 

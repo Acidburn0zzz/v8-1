@@ -31,6 +31,12 @@ PerThreadAssertKey kPerThreadAssertKey;
 }  // namespace
 
 
+// static
+void PerThreadAssertRuntime::TearDown() {
+  base::Thread::DeleteThreadLocalKey(kPerThreadAssertKey.Get());
+}
+
+
 class PerThreadAssertData final {
  public:
   PerThreadAssertData() : nesting_level_(0) {

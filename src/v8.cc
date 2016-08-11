@@ -9,6 +9,7 @@
 #include "src/base/atomicops.h"
 #include "src/base/once.h"
 #include "src/base/platform/platform.h"
+#include "src/base/utils/random-number-generator.h"
 #include "src/bootstrapper.h"
 #include "src/debug/debug.h"
 #include "src/deoptimizer.h"
@@ -47,8 +48,12 @@ void V8::TearDown() {
   ElementsAccessor::TearDown();
   RegisteredExtension::UnregisterAll();
   Isolate::GlobalTearDown();
+  base::OS::TearDown();
   sampler::Sampler::TearDown();
   FlagList::ResetAllFlags();  // Frees memory held by string arguments.
+  base::Time::TearDown();
+  base::RandomNumberGenerator::TearDown();
+  PerThreadAssertRuntime::TearDown();
 }
 
 
@@ -66,6 +71,7 @@ void V8::InitializeOncePerProcessImpl() {
     FLAG_max_semi_space_size = 1;
   }
 
+  base::OS::SetUp();
   base::OS::Initialize(FLAG_random_seed, FLAG_hard_abort, FLAG_gc_fake_mmap);
 
   Isolate::InitializeOncePerProcess();
