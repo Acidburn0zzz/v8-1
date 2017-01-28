@@ -35,6 +35,13 @@
       ],
       # Since this target generates header files, it needs to be a hard dependency.
       'hard_dependency': 1,
+      'conditions': [
+        ['want_separate_host_toolset==1', {
+          'toolsets': ['host', 'target'],
+        }, {
+          'toolsets': ['target'],
+        }],
+      ],
     },
     { 'target_name': 'inspector_debugger_script',
       'type': 'none',
@@ -60,6 +67,13 @@
       ],
       # Since this target generates header files, it needs to be a hard dependency.
       'hard_dependency': 1,
+      'conditions': [
+        ['want_separate_host_toolset==1', {
+          'toolsets': ['host', 'target'],
+        }, {
+          'toolsets': ['target'],
+        }],
+      ],
     },
     { 'target_name': 'protocol_compatibility',
       'type': 'none',
@@ -81,7 +95,14 @@
           ],
           'message': 'Generating inspector protocol sources from protocol json definition',
         },
-      ]
+      ],
+      'conditions': [
+        ['want_separate_host_toolset==1', {
+          'toolsets': ['host', 'target'],
+        }, {
+          'toolsets': ['target'],
+        }],
+      ],
     },
     { 'target_name': 'protocol_generated_sources',
       'type': 'none',
@@ -107,7 +128,14 @@
           ],
           'message': 'Generating inspector protocol sources from protocol json',
         },
-      ]
+      ],
+      'conditions': [
+        ['want_separate_host_toolset==1', {
+          'toolsets': ['host', 'target'],
+        }, {
+          'toolsets': ['target'],
+        }],
+      ],
     },
   ],
 }
