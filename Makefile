@@ -264,14 +264,15 @@ ANDROID_ARCHES = android_ia32 android_x64 android_arm android_arm64 \
 		 android_mipsel
 
 # List of files that trigger Makefile regeneration:
-GYPFILES = third_party/icu/icu.gypi third_party/icu/icu.gyp \
+GYPFILES = \
 	   gypfiles/shim_headers.gypi gypfiles/features.gypi \
            gypfiles/standalone.gypi \
 	   gypfiles/toolchain.gypi gypfiles/all.gyp gypfiles/mac/asan.gyp \
 	   test/cctest/cctest.gyp test/fuzzer/fuzzer.gyp \
 	   test/unittests/unittests.gyp src/v8.gyp \
 	   tools/parser-shell.gyp testing/gmock.gyp testing/gtest.gyp \
-	   samples/samples.gyp src/third_party/vtune/v8vtune.gyp src/d8.gyp
+	   samples/samples.gyp src/third_party/vtune/v8vtune.gyp src/d8.gyp \
+	   src/third_party/vtune/v8vtune.gyp src/d8.gyp
 
 # If vtunejit=on, the v8vtune.gyp will be appended.
 ifeq ($(vtunejit), on)

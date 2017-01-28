@@ -965,12 +965,25 @@
       ['OS=="win"', {
         'defines': [
           'WIN32',
+          'WINVER=0x0501',
+          '_WIN32_WINNT=0x0501',
+          'NTDDI_VERSION=0x05010100',
+          '_USING_V110_SDK71_',
         ],
         # 4351: VS 2005 and later are warning us that they've fixed a bug
         #       present in VS 2003 and earlier.
-        'msvs_disabled_warnings': [4351],
+        'msvs_disabled_warnings': [4267, 4351],
         'msvs_configuration_attributes': {
           'CharacterSet': '1',
+        },
+        'msvs_settings': {
+          'VCCLCompilerTool': {
+            'conditions': [
+              ['component=="static_library"', {
+                'ProgramDataBaseFileName': '$(OutDir)\\$(TargetName).pdb',
+              }]
+            ],
+          },
         },
       }],
       ['OS=="win" and v8_target_arch=="ia32"', {
@@ -1179,6 +1192,7 @@
             'FavorSizeOrSpeed': '0',
             'StringPooling': 'true',
             'BasicRuntimeChecks': '0',
+            'AdditionalOptions': ['/bigobj'],
             'conditions': [
               ['component=="shared_library" or force_dynamic_crt==1', {
                 'RuntimeLibrary': '3',  #/MDd
@@ -1356,6 +1370,8 @@
               # but Apple gcc does not unless it
               # is specified explicitly.
               'GCC_STRICT_ALIASING': 'YES',
+
+              'GCC_GENERATE_DEBUGGING_SYMBOLS': 'NO',
             },
           }],  # OS=="mac"
           ['OS=="win"', {
@@ -1366,6 +1382,7 @@
                 'EnableIntrinsicFunctions': 'true',
                 'FavorSizeOrSpeed': '0',
                 'StringPooling': 'true',
+                'AdditionalOptions': ['/bigobj'],
                 'conditions': [
                   ['component=="shared_library" or force_dynamic_crt==1', {
                     'RuntimeLibrary': '2',  #/MD
