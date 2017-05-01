@@ -21,12 +21,7 @@ namespace v8 {
 namespace internal {
 namespace trap_handler {
 
-// TODO(eholk): Support trap handlers on other platforms.
-#if V8_TARGET_ARCH_X64 && V8_OS_LINUX && !V8_OS_ANDROID
-#define V8_TRAP_HANDLER_SUPPORTED 1
-#else
 #define V8_TRAP_HANDLER_SUPPORTED 0
-#endif
 
 struct ProtectedInstructionData {
   // The offset of this instruction from the start of its code object.
@@ -52,14 +47,7 @@ int RegisterHandlerData(void* base, size_t size,
 /// Removes the data from the master list and frees any memory, if necessary.
 void ReleaseHandlerData(int index);
 
-#if V8_OS_WIN
-#define THREAD_LOCAL __declspec(thread)
-#elif V8_OS_ANDROID
-// TODO(eholk): fix this before enabling for trap handlers for Android.
 #define THREAD_LOCAL
-#else
-#define THREAD_LOCAL __thread
-#endif
 
 inline bool UseTrapHandler() {
   return FLAG_wasm_trap_handler && V8_TRAP_HANDLER_SUPPORTED;
