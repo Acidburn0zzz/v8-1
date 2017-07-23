@@ -114,6 +114,11 @@ v8::Platform* V8::GetCurrentPlatform() {
   return platform;
 }
 
+v8::Platform* V8::TryGetCurrentPlatform() {
+  return reinterpret_cast<v8::Platform*>(
+      base::Relaxed_Load(reinterpret_cast<base::AtomicWord*>(&platform_)));
+}
+
 void V8::SetPlatformForTesting(v8::Platform* platform) {
   base::Relaxed_Store(reinterpret_cast<base::AtomicWord*>(&platform_),
                       reinterpret_cast<base::AtomicWord>(platform));

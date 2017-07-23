@@ -6,8 +6,86 @@
 
 #include <errno.h>
 
+#include "src/base/platform/threading-backend.h"
+
 namespace v8 {
 namespace base {
+
+Mutex::Mutex() : impl_(GetThreadingBackend()->CreatePlainMutex()) {
+#ifdef DEBUG
+  level_ = 0;
+#endif
+}
+
+
+Mutex::~Mutex() {
+  DCHECK_EQ(0, level_);
+}
+
+
+void Mutex::Lock() {
+  impl_->Lock();
+  AssertUnheldAndMark();
+}
+
+
+void Mutex::Unlock() {
+  AssertHeldAndUnmark();
+  impl_->Unlock();
+}
+
+
+bool Mutex::TryLock() {
+  if (!impl_->TryLock()) {
+    return false;
+  }
+  AssertUnheldAndMark();
+  return true;
+}
+
+
+RecursiveMutex::RecursiveMutex()
+  : impl_(GetThreadingBackend()->CreateRecursiveMutex()) {
+#ifdef DEBUG
+  level_ = 0;
+#endif
+}
+
+
+RecursiveMutex::~RecursiveMutex() {
+  DCHECK_EQ(0, level_);
+}
+
+
+void RecursiveMutex::Lock() {
+  impl_->Lock();
+#ifdef DEBUG
+  DCHECK_LE(0, level_);
+  level_++;
+#endif
+}
+
+
+void RecursiveMutex::Unlock() {
+#ifdef DEBUG
+  DCHECK_LT(0, level_);
+  level_--;
+#endif
+  impl_->Unlock();
+}
+
+
+bool RecursiveMutex::TryLock() {
+  if (!impl_->TryLock()) {
+    return false;
+  }
+#ifdef DEBUG
+  DCHECK_LE(0, level_);
+  level_++;
+#endif
+  return true;
+}
+
 
 #if V8_OS_POSIX
 
@@ -107,85 +185,56 @@ static V8_INLINE bool TryLockNativeHandle(PCRITICAL_SECTION cs) {
   return TryEnterCriticalSection(cs) != FALSE;
 }
 
-#endif  // V8_OS_POSIX
+#endif
 
 
-Mutex::Mutex() {
+NativeMutex::NativeMutex() {
   InitializeNativeHandle(&native_handle_);
-#ifdef DEBUG
-  level_ = 0;
-#endif
 }
 
 
-Mutex::~Mutex() {
+NativeMutex::~NativeMutex() {
   DestroyNativeHandle(&native_handle_);
-  DCHECK_EQ(0, level_);
 }
 
 
-void Mutex::Lock() {
+void NativeMutex::Lock() {
   LockNativeHandle(&native_handle_);
-  AssertUnheldAndMark();
 }
 
 
-void Mutex::Unlock() {
-  AssertHeldAndUnmark();
+void NativeMutex::Unlock() {
   UnlockNativeHandle(&native_handle_);
 }
 
 
-bool Mutex::TryLock() {
-  if (!TryLockNativeHandle(&native_handle_)) {
-    return false;
-  }
-  AssertUnheldAndMark();
-  return true;
+bool NativeMutex::TryLock() {
+  return TryLockNativeHandle(&native_handle_);
 }
 
 
-RecursiveMutex::RecursiveMutex() {
+NativeRecursiveMutex::NativeRecursiveMutex() {
   InitializeRecursiveNativeHandle(&native_handle_);
-#ifdef DEBUG
-  level_ = 0;
-#endif
 }
 
 
-RecursiveMutex::~RecursiveMutex() {
+NativeRecursiveMutex::~NativeRecursiveMutex() {
   DestroyNativeHandle(&native_handle_);
-  DCHECK_EQ(0, level_);
 }
 
 
-void RecursiveMutex::Lock() {
+void NativeRecursiveMutex::Lock() {
   LockNativeHandle(&native_handle_);
-#ifdef DEBUG
-  DCHECK_LE(0, level_);
-  level_++;
-#endif
 }
 
 
-void RecursiveMutex::Unlock() {
-#ifdef DEBUG
-  DCHECK_LT(0, level_);
-  level_--;
-#endif
+void NativeRecursiveMutex::Unlock() {
   UnlockNativeHandle(&native_handle_);
 }
 
 
-bool RecursiveMutex::TryLock() {
-  if (!TryLockNativeHandle(&native_handle_)) {
-    return false;
-  }
-#ifdef DEBUG
-  DCHECK_LE(0, level_);
-  level_++;
-#endif
-  return true;
+bool NativeRecursiveMutex::TryLock() {
+  return TryLockNativeHandle(&native_handle_);
 }
 
 }  // namespace base

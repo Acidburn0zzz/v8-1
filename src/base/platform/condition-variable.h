@@ -59,7 +59,45 @@ class V8_BASE_EXPORT ConditionVariable final {
   // was notified prior to the timeout.
   bool WaitFor(Mutex* mutex, const TimeDelta& rel_time) WARN_UNUSED_RESULT;
 
-  // The implementation-defined native handle type.
+ private:
+  std::unique_ptr<ConditionVariableImpl> impl_;
+
+  DISALLOW_COPY_AND_ASSIGN(ConditionVariable);
+};
+
+
+// POD ConditionVariable initialized lazily (i.e. the first time Pointer() is
+// called).
+// Usage:
+//   static LazyConditionVariable my_condvar =
+//       LAZY_CONDITION_VARIABLE_INITIALIZER;
+//
+//   void my_function() {
+//     LockGuard<Mutex> lock_guard(&my_mutex);
+//     my_condvar.Pointer()->Wait(&my_mutex);
+//   }
+typedef LazyStaticInstance<
+    ConditionVariable, DefaultConstructTrait<ConditionVariable>,
+    ThreadSafeInitOnceTrait>::type LazyConditionVariable;
+
+#define LAZY_CONDITION_VARIABLE_INITIALIZER LAZY_STATIC_INSTANCE_INITIALIZER
+
+
+// -----------------------------------------------------------------------------
+// Default implementation
+
+class V8_BASE_EXPORT NativeConditionVariable final
+  : public ConditionVariableImpl {
+ public:
+  NativeConditionVariable();
+  ~NativeConditionVariable();
+
+  void NotifyOne();
+  void NotifyAll();
+  void Wait(MutexImpl* mutex);
+  bool WaitFor(MutexImpl* mutex, int64_t delta_in_microseconds)
+    WARN_UNUSED_RESULT;
+
 #if V8_OS_POSIX
   typedef pthread_cond_t NativeHandle;
 #elif V8_OS_WIN
@@ -94,25 +132,9 @@ class V8_BASE_EXPORT ConditionVariable final {
  private:
   NativeHandle native_handle_;
 
-  DISALLOW_COPY_AND_ASSIGN(ConditionVariable);
+  DISALLOW_COPY_AND_ASSIGN(NativeConditionVariable);
 };
 
-
-// POD ConditionVariable initialized lazily (i.e. the first time Pointer() is
-// called).
-// Usage:
-//   static LazyConditionVariable my_condvar =
-//       LAZY_CONDITION_VARIABLE_INITIALIZER;
-//
-//   void my_function() {
-//     LockGuard<Mutex> lock_guard(&my_mutex);
-//     my_condvar.Pointer()->Wait(&my_mutex);
-//   }
-typedef LazyStaticInstance<
-    ConditionVariable, DefaultConstructTrait<ConditionVariable>,
-    ThreadSafeInitOnceTrait>::type LazyConditionVariable;
-
-#define LAZY_CONDITION_VARIABLE_INITIALIZER LAZY_STATIC_INSTANCE_INITIALIZER
 
 }  // namespace base
 }  // namespace v8

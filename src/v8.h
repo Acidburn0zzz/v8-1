@@ -27,6 +27,7 @@ class V8 : public AllStatic {
   static void InitializePlatform(v8::Platform* platform);
   static void ShutdownPlatform();
   V8_EXPORT_PRIVATE static v8::Platform* GetCurrentPlatform();
+  V8_EXPORT_PRIVATE static v8::Platform* TryGetCurrentPlatform();
   // Replaces the current platform with the given platform.
   // Should be used only for testing.
   static void SetPlatformForTesting(v8::Platform* platform);
