@@ -115,10 +115,16 @@ void* OS::Allocate(const size_t requested, size_t* allocated,
 }
 
 void OS::Free(void* address, const size_t size) {
-  // TODO(1240712): munmap has a return value which is ignored here.
-  int result = munmap(address, size);
-  USE(result);
-  DCHECK(result == 0);
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    if (!backend->Release(address, size)) return;
+  } else {
+    // TODO(1240712): munmap has a return value which is ignored here.
+    int result = munmap(address, size);
+    USE(result);
+    DCHECK(result == 0);
+  }
+
   NotifyDeallocated(address, size);
 }
 

@@ -1876,6 +1876,8 @@
         'base/once.cc',
         'base/once.h',
         'base/optional.h',
+        'base/platform/memory-backend.cc',
+        'base/platform/memory-backend.h',
         'base/platform/threading-backend.cc',
         'base/platform/threading-backend.h',
         'base/platform/elapsed-timer.h',

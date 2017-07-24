@@ -775,42 +775,56 @@ void* OS::Allocate(const size_t requested, size_t* allocated,
 
 void* OS::Allocate(const size_t requested, size_t* allocated,
                    OS::MemoryPermission access, void* hint) {
+  LPVOID mbase;
   // VirtualAlloc rounds allocated size to page size automatically.
   size_t msize = RoundUp(requested, static_cast<int>(GetPageSize()));
 
-  // Windows XP SP2 allows Data Excution Prevention (DEP).
-  int prot = PAGE_NOACCESS;
-  switch (access) {
-    case OS::MemoryPermission::kNoAccess: {
-      prot = PAGE_NOACCESS;
-      break;
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    bool is_executable = access == OS::MemoryPermission::kReadWriteExecute;
+    mbase = backend->Allocate(msize, is_executable, hint);
+  } else {
+    // Windows XP SP2 allows Data Excution Prevention (DEP).
+    int prot = PAGE_NOACCESS;
+    switch (access) {
+      case OS::MemoryPermission::kNoAccess: {
+        prot = PAGE_NOACCESS;
+        break;
+      }
+      case OS::MemoryPermission::kReadWrite: {
+        prot = PAGE_READWRITE;
+        break;
+      }
+      case OS::MemoryPermission::kReadWriteExecute: {
+        prot = PAGE_EXECUTE_READWRITE;
+        break;
+      }
     }
-    case OS::MemoryPermission::kReadWrite: {
-      prot = PAGE_READWRITE;
-      break;
-    }
-    case OS::MemoryPermission::kReadWriteExecute: {
-      prot = PAGE_EXECUTE_READWRITE;
-      break;
-    }
+
+    mbase =
+        RandomizedVirtualAlloc(msize, MEM_COMMIT | MEM_RESERVE, prot, hint);
   }
-
-  LPVOID mbase =
-      RandomizedVirtualAlloc(msize, MEM_COMMIT | MEM_RESERVE, prot, hint);
-
   if (mbase == NULL) return NULL;
 
   DCHECK((reinterpret_cast<uintptr_t>(mbase) % OS::AllocateAlignment()) == 0);
 
   NotifyAllocated(mbase, msize);
+
   *allocated = msize;
+
   return mbase;
 }
 
 void OS::Free(void* address, const size_t size) {
-  // TODO(1240712): VirtualFree has a return value which is ignored here.
-  VirtualFree(address, 0, MEM_RELEASE);
-  USE(size);
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    if (!backend->Release(address, size)) return;
+  } else {
+    // TODO(1240712): VirtualFree has a return value which is ignored here.
+    VirtualFree(address, 0, MEM_RELEASE);
+    USE(size);
+  }
+
   NotifyDeallocated(address, size);
 }
 
@@ -1218,25 +1232,37 @@ VirtualMemory::VirtualMemory(size_t size, void* hint)
 
 VirtualMemory::VirtualMemory(size_t size, size_t alignment, void* hint)
     : address_(NULL), size_(0) {
-  DCHECK((alignment % OS::AllocateAlignment()) == 0);
-  size_t request_size = RoundUp(size + alignment,
-                                static_cast<intptr_t>(OS::AllocateAlignment()));
+  size_t native_alignment = OS::AllocateAlignment();
+  DCHECK((alignment % native_alignment) == 0);
+
+  size_t request_size;
+  if (alignment != native_alignment) {
+    request_size = RoundUp(size + alignment,
+                           static_cast<intptr_t>(native_alignment));
+  } else {
+    request_size = size;
+  }
+
   void* address = ReserveRegion(request_size, hint);
   if (address == NULL) return;
-  uint8_t* base = RoundUp(static_cast<uint8_t*>(address), alignment);
-  // Try reducing the size by freeing and then reallocating a specific area.
-  bool result = ReleaseRegion(address, request_size);
-  USE(result);
-  DCHECK(result);
-  address = VirtualAlloc(base, size, MEM_RESERVE, PAGE_NOACCESS);
-  if (address != NULL) {
-    request_size = size;
-    DCHECK(base == static_cast<uint8_t*>(address));
-  } else {
-    // Resizing failed, just go with a bigger area.
-    address = ReserveRegion(request_size, hint);
-    if (address == NULL) return;
+
+  if (alignment != native_alignment) {
+    uint8_t* base = RoundUp(static_cast<uint8_t*>(address), alignment);
+    // Try reducing the size by freeing and then reallocating a specific area.
+    bool result = ReleaseRegion(address, request_size);
+    USE(result);
+    DCHECK(result);
+    address = VirtualAlloc(base, size, MEM_RESERVE, PAGE_NOACCESS);
+    if (address != NULL) {
+      request_size = size;
+      DCHECK(base == static_cast<uint8_t*>(address));
+    } else {
+      // Resizing failed, just go with a bigger area.
+      address = ReserveRegion(request_size, hint);
+      if (address == NULL) return;
+    }
   }
+
   address_ = address;
   size_ = request_size;
 }
@@ -1278,11 +1304,21 @@ bool VirtualMemory::Guard(void* address) {
 }
 
 void* VirtualMemory::ReserveRegion(size_t size, void* hint) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Reserve(size, hint);
+  }
+
   return RandomizedVirtualAlloc(size, MEM_RESERVE, PAGE_NOACCESS, hint);
 }
 
 
 bool VirtualMemory::CommitRegion(void* base, size_t size, bool is_executable) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Commit(base, size, is_executable);
+  }
+
   int prot = is_executable ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
   if (NULL == VirtualAlloc(base, size, MEM_COMMIT, prot)) {
     return false;
@@ -1292,15 +1328,30 @@ bool VirtualMemory::CommitRegion(void* base, size_t size, bool is_executable) {
 
 
 bool VirtualMemory::UncommitRegion(void* base, size_t size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Uncommit(base, size);
+  }
+
   return VirtualFree(base, size, MEM_DECOMMIT) != 0;
 }
 
 bool VirtualMemory::ReleasePartialRegion(void* base, size_t size,
                                          void* free_start, size_t free_size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->ReleasePartial(base, size, free_start, free_size);
+  }
+
   return VirtualFree(free_start, free_size, MEM_DECOMMIT) != 0;
 }
 
 bool VirtualMemory::ReleaseRegion(void* base, size_t size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Release(base, size);
+  }
+
   return VirtualFree(base, 0, MEM_RELEASE) != 0;
 }
 

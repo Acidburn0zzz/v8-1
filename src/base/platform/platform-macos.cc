@@ -62,13 +62,25 @@ static const off_t kMmapFdOffset = 0;
 
 void* OS::Allocate(const size_t requested, size_t* allocated,
                    OS::MemoryPermission access, void* hint) {
+  void* mbase;
   const size_t msize = RoundUp(requested, getpagesize());
-  int prot = GetProtectionFromMemoryPermission(access);
-  void* mbase =
-      mmap(hint, msize, prot, MAP_PRIVATE | MAP_ANON, kMmapFd, kMmapFdOffset);
-  if (mbase == MAP_FAILED) return NULL;
+
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    bool is_executable = access == OS::MemoryPermission::kReadWriteExecute;
+    mbase = backend->Allocate(msize, is_executable, hint);
+    if (mbase == nullptr) return nullptr;
+  } else {
+    int prot = GetProtectionFromMemoryPermission(access);
+    mbase =
+        mmap(hint, msize, prot, MAP_PRIVATE | MAP_ANON, kMmapFd, kMmapFdOffset);
+    if (mbase == MAP_FAILED) return nullptr;
+  }
+
   NotifyAllocated(mbase, msize);
+
   *allocated = msize;
+
   return mbase;
 }
 
@@ -115,12 +127,21 @@ VirtualMemory::VirtualMemory(size_t size, void* hint)
 VirtualMemory::VirtualMemory(size_t size, size_t alignment, void* hint)
     : address_(NULL), size_(0) {
   DCHECK((alignment % OS::AllocateAlignment()) == 0);
+
+  void* reservation;
   size_t request_size = RoundUp(size + alignment,
                                 static_cast<intptr_t>(OS::AllocateAlignment()));
-  void* reservation =
-      mmap(hint, request_size, PROT_NONE,
-           MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, kMmapFd, kMmapFdOffset);
-  if (reservation == MAP_FAILED) return;
+
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    reservation = backend->Reserve(request_size, hint);
+    if (reservation == nullptr) return;
+  } else {
+    reservation =
+        mmap(hint, request_size, PROT_NONE,
+             MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, kMmapFd, kMmapFdOffset);
+    if (reservation == MAP_FAILED) return;
+  }
 
   uint8_t* base = static_cast<uint8_t*>(reservation);
   uint8_t* aligned_base = RoundUp(base, alignment);
@@ -179,6 +200,11 @@ bool VirtualMemory::Guard(void* address) {
 }
 
 void* VirtualMemory::ReserveRegion(size_t size, void* hint) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Reserve(size, hint);
+  }
+
   void* result =
       mmap(hint, size, PROT_NONE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE,
            kMmapFd, kMmapFdOffset);
@@ -192,6 +218,11 @@ void* VirtualMemory::ReserveRegion(size_t size, void* hint) {
 bool VirtualMemory::CommitRegion(void* address,
                                  size_t size,
                                  bool is_executable) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Commit(address, size, is_executable);
+  }
+
   int prot = PROT_READ | PROT_WRITE | (is_executable ? PROT_EXEC : 0);
   if (MAP_FAILED == mmap(address,
                          size,
@@ -206,6 +237,11 @@ bool VirtualMemory::CommitRegion(void* address,
 
 
 bool VirtualMemory::UncommitRegion(void* address, size_t size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Uncommit(address, size);
+  }
+
   return mmap(address,
               size,
               PROT_NONE,
@@ -216,10 +252,20 @@ bool VirtualMemory::UncommitRegion(void* address, size_t size) {
 
 bool VirtualMemory::ReleasePartialRegion(void* base, size_t size,
                                          void* free_start, size_t free_size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->ReleasePartial(base, size, free_start, free_size);
+  }
+
   return munmap(free_start, free_size) == 0;
 }
 
 bool VirtualMemory::ReleaseRegion(void* address, size_t size) {
+  auto backend = GetMemoryBackend();
+  if (backend != nullptr) {
+    return backend->Release(address, size);
+  }
+
   return munmap(address, size) == 0;
 }
 

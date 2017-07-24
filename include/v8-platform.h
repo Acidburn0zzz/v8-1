@@ -13,6 +13,7 @@
 namespace v8 {
 
 class Isolate;
+class MemoryBackend;
 class ThreadingBackend;
 class MutexImpl;
 class ConditionVariableImpl;
@@ -207,6 +208,11 @@ class Platform {
   virtual double MonotonicallyIncreasingTime() = 0;
 
   /**
+   * Returns an instance of a v8::MemoryBackend, or nullptr to use the default.
+   */
+  virtual MemoryBackend* GetMemoryBackend() { return nullptr; }
+
+  /**
    * Returns an instance of a v8::ThreadingBackend, or nullptr to use the
    * default.
    */
@@ -312,6 +318,47 @@ class Platform {
 
   /** Removes tracing state change observer. */
   virtual void RemoveTraceStateObserver(TraceStateObserver*) {}
+};
+
+/**
+ * V8 memory backend used for memory-allocations at page granularity.
+ *
+ * Can be implemented by an embedder for custom memory allocations.
+ */
+class MemoryBackend {
+ public:
+  virtual ~MemoryBackend() = default;
+
+  /**
+   * Allocates memory. Returns nullptr on failure.
+   */
+  virtual void* Allocate(const size_t size, bool is_executable, void* hint) = 0;
+
+  /**
+   * Reserves memory. Returns nullptr on failure.
+   */
+  virtual void* Reserve(size_t size, void* hint) = 0;
+
+  /**
+   * Commits memory. Returns true on success.
+   */
+  virtual bool Commit(void* base, size_t size, bool is_executable) = 0;
+
+  /**
+   * Uncommits memory. Returns true on success.
+   */
+  virtual bool Uncommit(void* base, size_t size) = 0;
+
+  /**
+   * Releases a partial region of memory. Returns true on success.
+   */
+  virtual bool ReleasePartial(void* base, size_t size, void* free_start,
+                              size_t free_size) = 0;
+
+  /**
+   * Releases a region of memory. Returns true on success.
+   */
+  virtual bool Release(void* base, size_t size) = 0;
 };
 
 /**
